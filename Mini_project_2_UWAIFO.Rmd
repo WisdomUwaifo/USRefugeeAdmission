@@ -1,0 +1,121 @@
+---
+title: "Mini Project 2"
+author: "Wisdom Uwaifo"
+date: '2022-07-19'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+## R Markdown
+
+# Memo or Reflection
+
+# What story are you telling with your new graphic?
+
+For this second mini project, I used a map to visualize the cumulative number of refugees admitted to the United States from 2005 to 2015.  The story I am telling with the map is to showcase where exactly the refugees came from. Based on the design, by just hovering over the countries represented on the map, you will be able to find out the name of the country and the cumulative numbers of refugees from that country. The color chosen for the map tells the readers which countries have the most refugees. Countries with a yellow color have the most while countries with fewer people have the indigo color.  This graph design is important because it can help inform foreign policy on refugee admission into the United States. 
+
+# How did you apply the principles of CRAP?
+
+CRAP is extremely important in graphic design, and I apply it to every graphic design I make, whether for a class or a personal project. For this first mini-project, I applied CRAP principles in the following ways: 
+-	Contrast: I made sure to put items that are the same together and items that are not the same separately. These include typographic contrast, weight contrast, size contrast, and color contrast.
+-	Repeat: - I also ensure that I repeat some aspects of the design throughout the piece. The repetitions include colors, headings or sub-headings, fonts, graphic elements, and alignments. 
+-	Every item should have a visual connection with something on the page. Mixing left and right alignment provides stronger contrast. 
+-	Lastly, I grouped related items—this is the proximity principle.
+
+# How did you apply Kieran Healy’s principles of great visualizations or Alberto Cairo’s five qualities of great visualizations?
+
+In this mini-project, I applied Alberto Caro's five qualities of great visualization. These qualities are: 
+-	Truthful: The data used for this project is from a reliable source. It was gathered and posted by the US Department of Homeland Security, and the graph is well-plotted to reflect the accurate data and show truthful trends. 
+-	Functional: The column graph used for this project is functional because it constitutes the accurate depiction of the data and is built in a way that lets people make meaningful decisions based on it. 
+-	Beautiful: I make sure that the graph is esthetically beautiful and attractive. The beauty comes from the combination of colors, alignments, and contrasts. 
+-	Insightful: The graph reveals trends and information that people would have had difficulty reading from raw data. Therefore, it is insightful. 
+-	Enlightening: The graph tells an entire story that can help important stakeholders understand countries where refugees come from the most and the least.
+
+
+```{r Load_packages_and_Data, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(sf)
+library(countrycode)
+library(plotly)
+library(dplyr)
+library(lubridate)
+library(scales)
+
+refugees_raw <- read_csv("Data/refugee_status.csv", na = c("-", "X", "D"))
+world_shapes <- read_sf("data/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
+
+```
+
+```{r Select_non_countries}
+non_countries <- c("Africa", "Asia", "Europe", "North America", "Oceania", 
+                   "South America", "Unknown", "Other", "Total")
+```
+
+```{r Clean_data, message=FALSE, warning=FALSE}
+refugees_clean <- refugees_raw %>%
+  rename(origin_country = `Continent/Country of Nationality`) %>%
+  filter(!(origin_country %in% non_countries)) %>% 
+  mutate(iso3 = countrycode(origin_country, "country.name", "iso3c",
+                            custom_match = c("Korea, North" = "PRK"))) %>%
+  mutate(origin_country = countrycode(iso3, "iso3c", "country.name"),
+         origin_region = countrycode(iso3, "iso3c", "region"),
+         origin_continent = countrycode(iso3, "iso3c", "continent")) %>%
+    gather(year, number, -origin_country, -iso3, -origin_region, -origin_continent) %>%
+    mutate(year = as.numeric(year),
+         year_date = ymd(paste0(year, "-01-01")))
+
+```
+
+```{r Select_year_2015, message=FALSE, warning=FALSE}
+refugees_countries_cumulative <- refugees_clean %>%
+  filter(year == 2015) %>%
+  select(iso3, number, origin_country) 
+```
+
+```{r Merge_data}
+refugees_world_map <- world_shapes %>%
+  left_join(refugees_countries_cumulative, by = c("ISO_A3" = "iso3")) %>%
+  filter(ISO_A3 != "ATA") 
+```
+
+
+```{r Create_map, message=FALSE, warning=FALSE}
+map1 <- ggplot() + 
+  geom_sf(data = refugees_world_map, 
+          aes(fill = number),
+          size = 0.25) +
+  coord_sf(crs = st_crs("ESRI:54030")) +
+  scale_fill_gradient(name = "Number", low = "#ADD8E6", high = "#00008B", na.value = "white", labels = comma) +
+  labs(fill = "number") +
+  theme_void() +
+  theme(legend.position = "right") +
+  labs(title = "Number of Refugees Admitted to the US in 2015", 
+       subtitle = "Annual Report by the US department of Homeland Security",
+       caption = "Source: The US Department of Homeland Security") + 
+  theme(plot.title = element_text(size = 20,
+                                  face = "bold",
+                                  family = "serif",
+                                  color = "black",
+                                  hjust = 0.5,
+                                  lineheight = 1.2),
+        plot.subtitle = element_text(size = 15,
+                                     family = "serif",
+                                     color = "black",
+                                     hjust = 0.5),
+        plot.caption = element_text(size = 15,
+                                    family = "serif",
+                                    hjust = 0.5)) 
+map1
+```
+
+
+
+```{r save_as_png_file, message=FALSE, warning=FALSE}
+ggsave(filename = "Output/refugee_migration.png", width = 8, height = 5)
+```
+
+```{r save_as_pdf_file, message=FALSE, warning=FALSE}
+ggsave(filename = "Output/refugee_migration.pdf", width = 8, height = 5)
+```
